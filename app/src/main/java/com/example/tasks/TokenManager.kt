@@ -19,7 +19,7 @@ class TokenManager(context: Context) {
     )
 
     fun clearToken() {
-        sharedPreferences.edit().remove("token").remove("username").apply()
+        sharedPreferences.edit() { remove("token").remove("username") }
     }
 
     fun saveUsername(username: String) {
@@ -37,12 +37,6 @@ class TokenManager(context: Context) {
     fun saveToken(token: String) {
         sharedPreferences.edit() {
             putString("jwt_token", token)
-        }
-    }
-
-    fun deleteToken() {
-        sharedPreferences.edit() {
-            remove("jwt_token")
         }
     }
 

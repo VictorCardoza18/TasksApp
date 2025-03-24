@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -81,7 +82,6 @@ class MainActivity : ComponentActivity() {
             TasksTheme {
                 val showLoginScreen = remember { mutableStateOf(tokenManager.getToken() == null) }
                 val isAuthenticated = remember { mutableStateOf(tokenManager.getToken() != null) }
-                val coroutineScope = rememberCoroutineScope()
                 val context = LocalContext.current
                 val username = remember { mutableStateOf(tokenManager.getUsername() ?: "") }
 
@@ -103,7 +103,7 @@ class MainActivity : ComponentActivity() {
                                         showLoginScreen.value = true
                                         Toast.makeText(context, "Sesión cerrada", Toast.LENGTH_SHORT).show()
                                     }) {
-                                        Icon(Icons.Filled.ExitToApp, contentDescription = "Cerrar Sesión")
+                                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar Sesión")
                                     }
                                 }
                             )
