@@ -5,21 +5,38 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tasks.data.LoginRequest
 import com.example.tasks.data.RegisterRequest
@@ -29,23 +46,18 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     private lateinit var api: TaskApi
     private lateinit var retrofit: Retrofit
-    private lateinit var tokenManager: TokenManager // Declara TokenManager
+    private lateinit var tokenManager: TokenManager
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        tokenManager = TokenManager.getInstance(applicationContext) // Inicializa TokenManager
+        tokenManager = TokenManager.getInstance(applicationContext)
 
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
@@ -53,7 +65,7 @@ class MainActivity : ComponentActivity() {
 
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
-            .addInterceptor(AuthInterceptor(applicationContext)) // Añade AuthInterceptor
+            .addInterceptor(AuthInterceptor(applicationContext))
             .build()
 
         retrofit = Retrofit.Builder()
@@ -64,24 +76,40 @@ class MainActivity : ComponentActivity() {
 
         api = retrofit.create(TaskApi::class.java)
 
+
         setContent {
             TasksTheme {
-                val showLoginScreen = remember { mutableStateOf(true) }
-                val isAuthenticated = remember { mutableStateOf(false) }
+                val showLoginScreen = remember { mutableStateOf(tokenManager.getToken() == null) }
+                val isAuthenticated = remember { mutableStateOf(tokenManager.getToken() != null) }
                 val coroutineScope = rememberCoroutineScope()
                 val context = LocalContext.current
+                val username = remember { mutableStateOf(tokenManager.getUsername() ?: "") }
+
+                LaunchedEffect(isAuthenticated.value) {
+                    username.value = tokenManager.getUsername() ?: ""
+                }
 
                 if (isAuthenticated.value) {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         topBar = {
                             TopAppBar(
-                                title = { Text("Tareas") },
-                                colors = TopAppBarDefaults.topAppBarColors()
+                                title = { Text("Tareas de ${username.value}") },
+                                colors = TopAppBarDefaults.topAppBarColors(),
+                                actions = { // Añade esta sección para el botón de logout
+                                    IconButton(onClick = {
+                                        tokenManager.clearToken()
+                                        isAuthenticated.value = false
+                                        showLoginScreen.value = true
+                                        Toast.makeText(context, "Sesión cerrada", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Filled.ExitToApp, contentDescription = "Cerrar Sesión")
+                                    }
+                                }
                             )
                         }
                     ) { innerPadding ->
-                        TaskListScreenWrapper(api = api, modifier = Modifier.padding(innerPadding)) // Pasa la instancia de api
+                        TaskListScreenWrapper(api = api, modifier = Modifier.padding(innerPadding))
                     }
                 } else {
                     Scaffold(
@@ -97,8 +125,10 @@ class MainActivity : ComponentActivity() {
                             LoginScreen(
                                 modifier = Modifier.padding(innerPadding),
                                 onNavigateToRegister = { showLoginScreen.value = false },
-                                onLoginSuccess = { token ->
-                                    tokenManager.saveToken(token) // Guarda el token de forma segura
+                                onLoginSuccess = { token, fetchedUsername ->
+                                    tokenManager.saveToken(token)
+                                    tokenManager.saveUsername(fetchedUsername)
+                                    username.value = fetchedUsername
                                     isAuthenticated.value = true
                                     Toast.makeText(context, "Inicio de sesión exitoso", Toast.LENGTH_SHORT).show()
                                 },
@@ -108,7 +138,7 @@ class MainActivity : ComponentActivity() {
                             RegisterScreen(
                                 onNavigateToLogin = { showLoginScreen.value = true },
                                 onRegisterSuccess = { token ->
-                                    tokenManager.saveToken(token) // Guarda el token de forma segura
+                                    tokenManager.saveToken(token)
                                     isAuthenticated.value = true
                                     Toast.makeText(context, "Registro exitoso", Toast.LENGTH_SHORT).show()
                                 },
@@ -126,7 +156,7 @@ class MainActivity : ComponentActivity() {
 fun LoginScreen(
     modifier: Modifier = Modifier,
     onNavigateToRegister: () -> Unit,
-    onLoginSuccess: (String) -> Unit,
+    onLoginSuccess: (String, String) -> Unit,
     api: TaskApi
 ) {
     var email by remember { mutableStateOf("") }
@@ -163,10 +193,10 @@ fun LoginScreen(
                 val response = api.login(loginRequest)
                 if (response.isSuccessful) {
                     val authResponse = response.body()
-                    authResponse?.token?.let { token ->
-                        onLoginSuccess(token)
+                    authResponse?.let {
+                        onLoginSuccess(it.token, it.username)
                     } ?: run {
-                        Toast.makeText(context, "Error: Token no encontrado en la respuesta", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Error: Respuesta de inicio de sesión inválida", Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     val errorBody = response.errorBody()?.string()
@@ -275,7 +305,7 @@ fun RegisterScreen(
 }
 
 @Composable
-fun TaskListScreenWrapper(api: TaskApi, modifier: Modifier = Modifier) { // Recibe la instancia de api
+fun TaskListScreenWrapper(api: TaskApi, modifier: Modifier = Modifier) {
     val viewModel: TaskViewModel = viewModel(
         factory = TaskViewModel.Factory(TaskRepository(api))
     )

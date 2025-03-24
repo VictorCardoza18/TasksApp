@@ -10,13 +10,25 @@ class TokenManager(context: Context) {
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val sharedPreferences = EncryptedSharedPreferences.create(
+    val sharedPreferences = EncryptedSharedPreferences.create(
         context,
         "auth_prefs",
         masterKey,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
+
+    fun clearToken() {
+        sharedPreferences.edit().remove("token").remove("username").apply()
+    }
+
+    fun saveUsername(username: String) {
+        sharedPreferences.edit() { putString("username", username) }
+    }
+
+    fun getUsername(): String? {
+        return sharedPreferences.getString("username", null)
+    }
 
     fun getToken(): String? {
         return sharedPreferences.getString("jwt_token", null)

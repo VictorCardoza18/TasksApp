@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,7 +70,7 @@ fun TaskListScreen(viewModel: TaskViewModel, modifier: Modifier = Modifier) {
                         },
                         onEdit = { /* TODO: Implementar navegación a pantalla de edición */ }
                     )
-                    Divider()
+                    HorizontalDivider()
                 }
             }
 
