@@ -5,53 +5,107 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
+
     private val _tasks = MutableStateFlow<List<Task>>(emptyList())
     val tasks: StateFlow<List<Task>> = _tasks
 
-    private val _task = MutableStateFlow<Task?>(null)
-    val task: StateFlow<Task?> = _task
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
+
+    private val _taskDetail = MutableStateFlow<Task?>(null)
+    val taskDetail: StateFlow<Task?> = _taskDetail
 
     init {
         loadTasks()
     }
 
     fun loadTasks() {
+        _isLoading.update { true }
+        _errorMessage.update { null }
         viewModelScope.launch {
-            _tasks.value = repository.getTasks()
+            val response = repository.getTasks()
+            _isLoading.update { false }
+            if (response.isSuccessful) {
+                _tasks.update { response.body() ?: emptyList() }
+            } else {
+                _errorMessage.update { "Error al cargar las tareas: ${response.errorBody()?.string() ?: response.message()}" }
+            }
         }
     }
 
-    fun loadTask(id: Int) {
+    fun createTask(title: String, description: String, date: String? = null, user: String) {
+        _isLoading.update { true }
+        _errorMessage.update { null }
         viewModelScope.launch {
-            _task.value = repository.getTask(id)
+            val newTask = Task(
+                title = title, description = description, date = date,
+                user = User, id = null
+            )
+            val response = repository.createTask(newTask)
+            _isLoading.update { false }
+            if (response.isSuccessful) {
+                response.body()?.let { savedTask ->
+                    _tasks.update { it + savedTask }
+                }
+            } else {
+                _errorMessage.update { "Error al crear la tarea: ${response.errorBody()?.string() ?: response.message()}" }
+            }
         }
     }
 
-    fun createTask(task: Task) {
+    fun getTask(id: String) {
+        _isLoading.update { true }
+        _errorMessage.update { null }
         viewModelScope.launch {
-            repository.createTask(task)
-            loadTasks() // Recargar la lista
+            val response = repository.getTask(id)
+            _isLoading.update { false }
+            if (response.isSuccessful) {
+                _taskDetail.update { response.body() }
+            } else {
+                _errorMessage.update { "Error al obtener la tarea: ${response.errorBody()?.string() ?: response.message()}" }
+            }
         }
     }
 
-    fun updateTask(id: Int, task: Task) {
+    fun deleteTask(id: String) {
+        _isLoading.update { true }
+        _errorMessage.update { null }
         viewModelScope.launch {
-            repository.updateTask(id, task)
-            loadTasks() // Recargar la lista
+            val response = repository.deleteTask(id)
+            _isLoading.update { false }
+            if (response.isSuccessful) {
+                _tasks.update { it.filter { task -> task.id != id } }
+            } else {
+                _errorMessage.update { "Error al eliminar la tarea: ${response.errorBody()?.string() ?: response.message()}" }
+            }
         }
     }
 
-    fun deleteTask(id: Int) {
+    fun updateTask(task: Task) {
+        _isLoading.update { true }
+        _errorMessage.update { null }
         viewModelScope.launch {
-            repository.deleteTask(id)
-            loadTasks() // Recargar la lista
+            val response = repository.updateTask(task.id!!, task)
+            _isLoading.update { false }
+            if (response.isSuccessful) {
+                response.body()?.let { updatedTask ->
+                    _tasks.update { currentTasks ->
+                        currentTasks.map { if (it.id == updatedTask.id) updatedTask else it }
+                    }
+                }
+            } else {
+                _errorMessage.update { "Error al actualizar la tarea: ${response.errorBody()?.string() ?: response.message()}" }
+            }
         }
     }
 
-    // Agregar la Factory aquí
     class Factory(private val repository: TaskRepository) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(TaskViewModel::class.java)) {
